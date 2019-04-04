@@ -1,7 +1,14 @@
 <resources>
-    <style name="AppTheme" parent="Theme.AppCompat.DayNight.DarkActionBar">
+    <style name="NocturnalDayNight" parent="Theme.AppCompat.DayNight.DarkActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+    </style>
+    <style name="OLED" parent="Theme.AppCompat">
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorOLEDBlack</item>
+        <item name="colorAccent">@color/colorPrimary</item>
+        <item name="colorBackgroundFloating">@color/colorOLEDBlack</item>
+        <item name="android:windowBackground">@color/colorOLEDBlack</item>
     </style>
 </resources>
