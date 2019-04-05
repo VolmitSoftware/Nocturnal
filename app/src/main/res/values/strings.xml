@@ -15,4 +15,5 @@
     <string name="delete_cycle_data">Delete Cycle Data</string>
     <string name="you_can_delete_all_of_your_sleep_cycle_history_and_logs_here">You can delete all of your sleep cycle history, and logs here.</string>
     <string name="you_can_delete_your_sleep_cycle_data_from_nocturnal_and_start_fresh_again">You can delete your sleep cycle data from Nocturnal and start fresh again.</string>
+    <string name="current_cycle">Current Cycle</string>
 </resources>

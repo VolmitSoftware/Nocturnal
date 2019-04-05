@@ -19,8 +19,8 @@
         </activity>
         <service
             android:name=".NocturnalTileService"
-            android:icon="@color/colorPrimaryDark"
-            android:label="Nocturnal"
+            android:icon="@drawable/baseline_wb_sunny_black_18dp"
+            android:label="Wake Up"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action
