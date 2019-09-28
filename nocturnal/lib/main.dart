@@ -92,6 +92,11 @@ class _Nocturnal extends State<Nocturnal> {
       itr++;
     });
 
+    if(itr == 0)
+    {
+      return 0;
+    }
+
     return (avg / itr).round();
   }
 
@@ -140,8 +145,19 @@ class _Nocturnal extends State<Nocturnal> {
     setState(() {
       events.events.add(new NocturnalEvent(timeMs(), awake ? NocturnalAction.GOING_TO_SLEEP : NocturnalAction.WAKING_UP));
       awake = !awake;
-    });
     updateCalculations();
+    });
+    saveData(events).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + events.events.length.toString() + " Entries"));
+    saveAwake(awake).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + (awake ? "Awake" : "Asleep")));
+  }
+
+  void clearEvents()
+  {
+    setState(() {
+      events.events.clear();
+      awake = true;
+      updateCalculations();
+    });
     saveData(events).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + events.events.length.toString() + " Entries"));
     saveAwake(awake).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + (awake ? "Awake" : "Asleep")));
   }
@@ -156,6 +172,12 @@ class _Nocturnal extends State<Nocturnal> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        actions: <Widget>[
+          IconButton(
+            icon: Icon(Icons.delete),
+            onPressed: () => clearEvents()
+          )
+        ],
       ),
       body: Center(
         child: Column(
@@ -212,6 +234,11 @@ class NocturnalEvents
   {
     String f = "";
     events.forEach((e) => f += "&" + e.toString());
+
+    if(f.length == 0)
+    {
+      return "";
+    }
 
     return f.substring(1);
   }
