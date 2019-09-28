@@ -1,10 +1,5 @@
-import 'dart:collection';
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:nocturnal/nocons_icons.dart';
-import 'package:nocturnal/objects.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer' as log;
 
@@ -121,4 +116,59 @@ class _Nocturnal extends State<Nocturnal> {
       ),
     );
   }
+}
+
+class NocturnalEvent
+{
+  int ms;
+  NocturnalAction action;
+  NocturnalEvent(this.ms, this.action);
+
+  String toString()
+  {
+    return "$ms:" + action.index.toString();
+  }
+}
+
+class NocturnalEvents
+{
+  List<NocturnalEvent> events = new List<NocturnalEvent>();
+
+  void add(NocturnalEvent e)
+  {
+    events.add(e);
+  }
+
+  void fromString(String s)
+  {
+    if(!s.contains("&"))
+    {
+      add(new NocturnalEvent(int.parse(s.split(":")[0]), NocturnalAction.values[int.parse(s.split(":")[1])]));
+      return;
+    }
+
+    s.split("&").forEach((e) => add(new NocturnalEvent(int.parse(e.split(":")[0]), NocturnalAction.values[int.parse(e.split(":")[1])])));
+  }
+
+  String toString()
+  {
+    String f = "";
+    events.forEach((e) => f += "&" + e.toString());
+
+    return f.substring(1);
+  }
+}
+
+enum NocturnalAction
+{
+  GOING_TO_SLEEP,
+  WAKING_UP
+}
+
+class Nocons {
+  Nocons._();
+  static const _kFontFam = 'Nocons';
+  static const IconData icons8_moon_symbol = const IconData(0xe800, fontFamily: _kFontFam);
+  static const IconData icons8_sun = const IconData(0xe801, fontFamily: _kFontFam);
+  static const IconData icons8_occupied_bed = const IconData(0xe802, fontFamily: _kFontFam);
 }
