@@ -1,14 +1,10 @@
+import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer' as log;
 
 void main() => runApp(NocturnalApp());
-
-int timeMs()
-{
-   return DateTime.now().millisecondsSinceEpoch;
-}
 
 class _NocturnalApp extends State<NocturnalApp> {
   Brightness brightness = Brightness.light;
@@ -65,6 +61,11 @@ class _Nocturnal extends State<Nocturnal> {
   int fullCount = 0;
   int dayCount = 0;
   int nightCount = 0;
+  int percentAwake = 0;
+  int percentAsleep = 0;
+  String wakeTime = "";
+  String sleepTime = "";
+  int offsetms = 0;
 
   _Nocturnal()
   {
@@ -76,6 +77,11 @@ class _Nocturnal extends State<Nocturnal> {
       log.log("Entries: " + events.events.length.toString());
       updateCalculations();
     })));
+  }
+  
+  int timeMs()
+  {
+    return DateTime.now().millisecondsSinceEpoch + offsetms;
   }
 
   List<Cycle> getFullCycles(int max)
@@ -163,6 +169,8 @@ class _Nocturnal extends State<Nocturnal> {
     {
       return -1;
     }
+
+  log.log("Hm" + (avg / itr).round().toString());
 
     return (avg / itr).round();
   }
@@ -259,6 +267,58 @@ class _Nocturnal extends State<Nocturnal> {
     return events.events.length - (events.events.length % 2 == 0 ? 0 : 1);
   }
 
+  String computeTime(int cycles, NocturnalAction a)
+  {
+    int ams = 0;
+    int c = 0;
+    getHalfCycles(cycles, a).forEach((cycle) {
+      DateTime d = DateTime.fromMillisecondsSinceEpoch(cycle.startTime);
+      ams += d.minute * 1000 * 60;
+      ams += d.hour * 1000 * 60 * 60;
+      log.log("Hour is " + d.hour.toString());
+      c++;
+    });
+
+    if(c != cycles)
+    {
+      return "Unknown";
+    }
+
+    int hou = 0;
+    int min = 0;
+
+    ams = (ams / c).floor().toInt();
+
+    if(ams > 60 * 1000 * 60)
+    {
+      hou = (ams / (1000 * 60 * 60)).floor();
+      ams -= hou * 60 * 60 * 1000;
+      min = (ams / (1000 * 60)).ceil();
+    }
+    
+    return h12(hou).toString() + ":" + minify(min) + " " + ampm(hou);
+  }
+
+  int h12(int h24)
+  {
+    return (h24 + 1 > 12) ? (h24 - 12) : h24;
+  }
+
+  String ampm(int h)
+  {
+    return (h + 1 > 12) ? "PM" : "AM";
+  }
+  
+  String minify(int m)
+  {
+    if(m < 10)
+    {
+      return "0$m";
+    }
+
+    return "$m";
+  }
+
   void updateCalculations()
   {
     fullCount = computeFullCycleCount();
@@ -273,41 +333,39 @@ class _Nocturnal extends State<Nocturnal> {
     avgCycleLength31 = computeAverageFullCycleTime(14); 
     avgDayCycleLength31 = computeAverageHalfCycleTime(31, NocturnalAction.WAKING_UP); 
     avgNightCycleLength31 = computeAverageHalfCycleTime(31, NocturnalAction.GOING_TO_SLEEP); 
+    
+    if(avgNightCycleLength31 > 0 && avgDayCycleLength31 > 0 && avgCycleLength31 > 0)
+    {
+      percentAwake = ((avgDayCycleLength31 / avgCycleLength31) * 100).round();
+      percentAsleep = ((avgNightCycleLength31 / avgCycleLength31) * 100).round();
+    }
+
+    else if(avgNightCycleLength7 > 0 && avgDayCycleLength7 > 0 && avgCycleLength7 > 0)
+    {
+      percentAwake = ((avgDayCycleLength7 / avgCycleLength7) * 100).round();
+      percentAsleep = ((avgNightCycleLength7 / avgCycleLength7) * 100).round();
+    }
+
+    else if(avgNightCycleLength3 > 0 && avgDayCycleLength3 > 0 && avgCycleLength3 > 0)
+    {
+      percentAwake = ((avgDayCycleLength3 / avgCycleLength3) * 100).round();
+      percentAsleep = ((avgNightCycleLength3 / avgCycleLength3) * 100).round();
+    }
+
+    else
+    {
+      percentAwake = 50;
+      percentAsleep = 50;
+    }
+
+    wakeTime = computeTime(3, NocturnalAction.WAKING_UP);
+    sleepTime = computeTime(3, NocturnalAction.GOING_TO_SLEEP);
   }
 
-  String duration(int ms)
+  void addHourOffset()
   {
-    if(ms <= 0)
-    {
-      return "Unknown";
-    }
-
-    if(ms > 1000 * 60 * 60)
-    {
-      return (ms / 1000 * 60 * 60).toStringAsPrecision(1) + " Hours";
-    }
-
-    if(ms > 1000 * 60)
-    {
-      return (ms / 1000 * 60).round().toInt().toString() + " Minutes";
-    }
-
-    if(ms > 1000)
-    {
-      return (ms / 1000).round().toInt().toString() + " Seconds";
-    }
-
-    return "$ms Ms";
-  }
-
-  String minify(int m)
-  {
-    if(m < 10)
-    {
-      return "0$m";
-    }
-
-    return "$m";
+    offsetms += 1000 * 60 * 60; 
+    log.log("Foward in time: " + (offsetms / (1000 * 60 * 60)).toString());
   }
 
   @override
@@ -321,6 +379,10 @@ class _Nocturnal extends State<Nocturnal> {
           IconButton(
             icon: Icon(Icons.delete),
             onPressed: () => clearEvents()
+          ),
+          IconButton(
+            icon: Icon(Icons.tonality),
+            onPressed: () => addHourOffset()
           )
         ],
       ),
@@ -349,164 +411,45 @@ class _Nocturnal extends State<Nocturnal> {
                 )
               ),
             ),
-            Padding(
-              padding: EdgeInsets.all(3),
-              child: Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text("Full Cycle",
-                        style: TextStyle(
-                          fontSize: 24
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text("$fullCount Entries",
-                        style: TextStyle(
-                          fontSize: 18
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgCycleLength31),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade900 : sw.shade100,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgCycleLength7),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade600 : sw.shade200,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgCycleLength3),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade400 : sw.shade300,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              ),
+            TimeCard(
+              awake: awake,
+              c31: avgCycleLength31,
+              c7: avgCycleLength7,
+              c3: avgCycleLength3,
+              count: fullCount,
+              title: "Full Cycle",
+              sw: sw,
             ),
-            Padding(
-              padding: EdgeInsets.all(3),
-              child: Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text("Night Cycle",
-                        style: TextStyle(
-                          fontSize: 24
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text("$nightCount Entries",
-                        style: TextStyle(
-                          fontSize: 18
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgNightCycleLength31),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade900 : sw.shade100,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgNightCycleLength7),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade600 : sw.shade200,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgNightCycleLength3),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade400 : sw.shade300,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              ),
+            TimeCard(
+              awake: awake,
+              c31: avgNightCycleLength31,
+              c7: avgNightCycleLength7,
+              c3: avgNightCycleLength3,
+              count: nightCount,
+              title: "Night Cycle",
+              sw: sw,
             ),
-            Padding(
-              padding: EdgeInsets.all(3),
-              child: Card(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text("Day Cycle",
-                        style: TextStyle(
-                          fontSize: 24
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text("$dayCount Entries",
-                        style: TextStyle(
-                          fontSize: 18
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgDayCycleLength31),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade900 : sw.shade100,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgDayCycleLength7),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade600 : sw.shade200,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(7),
-                      child: Text(duration(avgDayCycleLength3),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: awake ? sw.shade400 : sw.shade300,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              ),
+            TimeCard(
+              awake: awake,
+              c31: avgDayCycleLength31,
+              c7: avgDayCycleLength7,
+              c3: avgDayCycleLength3,
+              count: dayCount,
+              title: "Day Cycle",
+              sw: sw,
+            ),
+            PieCard(
+              awake: awake,
+              percentAwake: percentAwake,
+              percentAsleep: percentAsleep,
+            ),
+            TextCard(
+              awake: awake,
+              sw: sw,
+              title: "Wake Up",
+              text: wakeTime,
+              title2: "Fall Asleep",
+              text2: sleepTime,
             )
           ],
         )
@@ -516,6 +459,206 @@ class _Nocturnal extends State<Nocturnal> {
         tooltip: 'Sleep',
         backgroundColor: awake ? Colors.indigo : Colors.deepPurple,
         child: Icon(awake ? Nocons.icons8_moon_symbol : Nocons.icons8_sun)
+      ),
+    );
+  }
+}
+
+class PieCard extends StatelessWidget
+{
+  final bool awake;
+  final int percentAwake;
+  final int percentAsleep;
+
+  PieCard({this.awake, this.percentAwake, this.percentAsleep});
+
+  @override
+  Widget build(BuildContext context) {
+
+    return  Padding(
+      padding: EdgeInsets.all(3),
+      child: Card(
+        child: charts.PieChart(
+          [
+            new charts.Series<NocturnalCycleSegment, int>(
+              id: 'Time',
+              domainFn: (NocturnalCycleSegment sales, _) => sales.awake,
+              measureFn: (NocturnalCycleSegment sales, _) => sales.percentCycle,
+              colorFn: (NocturnalCycleSegment sales, _) => sales.color,
+              data: [
+                new NocturnalCycleSegment(0, percentAwake, charts.ColorUtil.fromDartColor(awake ? Colors.indigo.shade500 : Colors.indigo.shade900.withOpacity(0.5))),
+                new NocturnalCycleSegment(1, percentAsleep, charts.ColorUtil.fromDartColor(awake ? Colors.deepPurple.shade100 : Colors.deepPurple.shade400)),
+              ],
+            )
+          ],
+          animate: true,
+          defaultRenderer: new charts.ArcRendererConfig(arcWidth: 60)
+        )
+      ),
+    );
+  }
+}
+
+class TimeCard extends StatelessWidget
+{
+  final int c31;
+  final int c7;
+  final int c3;
+  final bool awake;
+  final String title;
+  final int count;
+  final MaterialColor sw;
+
+  TimeCard({this.c31, this.c7, this.c3, this.awake, this.title, this.count, this.sw});
+
+  String duration(int ms)
+  {
+    if(ms <= 0)
+    {
+      return "Unknown";
+    }
+
+    if(ms > 1000 * 60 * 60)
+    {
+      return ((ms / (1000 * 60 * 60)).toStringAsFixed(1) + " Hours").replaceFirst(".0", "");
+    }
+
+    if(ms > 1000 * 60)
+    {
+      return (ms / (1000 * 60)).round().toInt().toString() + " Minutes";
+    }
+
+    if(ms > 1000)
+    {
+      return (ms / 1000).round().toInt().toString() + " Seconds";
+    }
+
+    return "$ms Ms";
+  }
+
+  String minify(int m)
+  {
+    if(m < 10)
+    {
+      return "0$m";
+    }
+
+    return "$m";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(3),
+      child: Card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(title,
+                style: TextStyle(
+                  fontSize: 24
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text("$count Entries",
+                style: TextStyle(
+                  fontSize: 18
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(duration(c31),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: awake ? sw.shade900 : sw.shade100,
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(duration(c7),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: awake ? sw.shade600 : sw.shade200,
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(duration(c3),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: awake ? sw.shade400 : sw.shade300,
+                ),
+              ),
+            ),
+          ],
+        )
+      ),
+    );
+  }
+}
+
+class TextCard extends StatelessWidget
+{
+  final bool awake;
+  final String title;
+  final String text;
+  final String title2;
+  final String text2;
+  final MaterialColor sw;
+
+  TextCard({this.awake, this.title, this.title2, this.sw, this.text, this.text2});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.all(3),
+      child: Card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(title,
+                style: TextStyle(
+                  fontSize: 24,
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(text,
+                style: TextStyle(
+                  fontSize: 18, 
+                  color: awake ? Colors.indigo.shade700 : Colors.indigo.shade200
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(title2,
+                style: TextStyle(
+                  fontSize: 24,
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(7),
+              child: Text(text2,
+                style: TextStyle(
+                  fontSize: 18,
+                  color: awake ? Colors.deepPurple.shade700 : Colors.deepPurple.shade200
+                ),
+              ),
+            ),
+          ],
+        )
       ),
     );
   }
@@ -583,6 +726,15 @@ enum NocturnalAction
 {
   GOING_TO_SLEEP,
   WAKING_UP
+}
+
+class NocturnalCycleSegment
+{
+  int awake = 0;
+  int percentCycle = 0;
+  charts.Color color = charts.Color.black;
+
+  NocturnalCycleSegment(this.awake, this.percentCycle, this.color);
 }
 
 class Nocons {
