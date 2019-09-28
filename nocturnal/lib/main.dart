@@ -10,18 +10,35 @@ int timeMs()
    return DateTime.now().millisecondsSinceEpoch;
 }
 
-class NocturnalApp extends StatelessWidget {
+class _NocturnalApp extends State<NocturnalApp> {
+  Brightness brightness = Brightness.light;
+
+  void updateAwake(bool a)
+  {
+    setState(() {
+      brightness = a ? Brightness.light : Brightness.dark; 
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Nocturnal',
       theme: ThemeData(
         primarySwatch: Colors.indigo,
-        brightness: Brightness.light
+        brightness: brightness
       ),
       home: Nocturnal(title: 'Nocturnal'),
     );
   }
+}
+
+class NocturnalApp extends StatefulWidget {
+  static _NocturnalApp of(BuildContext context) => context.ancestorStateOfType(const TypeMatcher<_NocturnalApp>());
+  NocturnalApp({Key key}) : super(key: key);
+
+  @override
+  _NocturnalApp createState() => _NocturnalApp();
 }
 
 class Nocturnal extends StatefulWidget {
@@ -217,6 +234,7 @@ class _Nocturnal extends State<Nocturnal> {
     });
     saveData(events).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + events.events.length.toString() + " Entries"));
     saveAwake(awake).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + (awake ? "Awake" : "Asleep")));
+    NocturnalApp.of(context).updateAwake(awake);
   }
 
   void clearEvents()
@@ -228,6 +246,7 @@ class _Nocturnal extends State<Nocturnal> {
     });
     saveData(events).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + events.events.length.toString() + " Entries"));
     saveAwake(awake).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + (awake ? "Awake" : "Asleep")));
+    NocturnalApp.of(context).updateAwake(awake);
   }
 
   int computeFullCycleCount()
@@ -293,10 +312,11 @@ class _Nocturnal extends State<Nocturnal> {
 
   @override
   Widget build(BuildContext context) {
+    MaterialColor sw = awake ? Colors.indigo : Colors.deepPurple;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: awake ? Colors.indigo : Colors.deepPurple,
         actions: <Widget>[
           IconButton(
             icon: Icon(Icons.delete),
@@ -321,7 +341,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(awake ? "Awake" : "Asleep",
                         style: TextStyle(
                           fontSize: 48,
-                          color: awake ? Colors.indigo.shade700 : Colors.deepPurple.shade800
+                          color: awake ? sw.shade700 : sw.shade200
                         ),
                       ),
                     ),
@@ -356,7 +376,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgCycleLength31),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade900,
+                          color: awake ? sw.shade900 : sw.shade100,
                         ),
                       ),
                     ),
@@ -365,7 +385,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgCycleLength7),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade600,
+                          color: awake ? sw.shade600 : sw.shade200,
                         ),
                       ),
                     ),
@@ -374,7 +394,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgCycleLength3),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade400
+                          color: awake ? sw.shade400 : sw.shade300,
                         ),
                       ),
                     ),
@@ -409,7 +429,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgNightCycleLength31),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade900,
+                          color: awake ? sw.shade900 : sw.shade100,
                         ),
                       ),
                     ),
@@ -418,7 +438,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgNightCycleLength7),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade600,
+                          color: awake ? sw.shade600 : sw.shade200,
                         ),
                       ),
                     ),
@@ -427,7 +447,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgNightCycleLength3),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade400
+                          color: awake ? sw.shade400 : sw.shade300,
                         ),
                       ),
                     ),
@@ -462,7 +482,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgDayCycleLength31),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade900,
+                          color: awake ? sw.shade900 : sw.shade100,
                         ),
                       ),
                     ),
@@ -471,7 +491,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgDayCycleLength7),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade600,
+                          color: awake ? sw.shade600 : sw.shade200,
                         ),
                       ),
                     ),
@@ -480,7 +500,7 @@ class _Nocturnal extends State<Nocturnal> {
                       child: Text(duration(avgDayCycleLength3),
                         style: TextStyle(
                           fontSize: 16,
-                          color: Colors.indigo.shade400
+                          color: awake ? sw.shade400 : sw.shade300,
                         ),
                       ),
                     ),
