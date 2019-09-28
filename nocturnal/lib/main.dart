@@ -65,7 +65,6 @@ class _Nocturnal extends State<Nocturnal> {
   int percentAsleep = 0;
   String wakeTime = "";
   String sleepTime = "";
-  int offsetms = 0;
 
   _Nocturnal()
   {
@@ -81,7 +80,7 @@ class _Nocturnal extends State<Nocturnal> {
   
   int timeMs()
   {
-    return DateTime.now().millisecondsSinceEpoch + offsetms;
+    return DateTime.now().millisecondsSinceEpoch;
   }
 
   List<Cycle> getFullCycles(int max)
@@ -271,11 +270,20 @@ class _Nocturnal extends State<Nocturnal> {
   {
     int ams = 0;
     int c = 0;
+    int lastms = -1;
+    int offsetmsper = 0;
     getHalfCycles(cycles, a).forEach((cycle) {
       DateTime d = DateTime.fromMillisecondsSinceEpoch(cycle.startTime);
       ams += d.minute * 1000 * 60;
       ams += d.hour * 1000 * 60 * 60;
       log.log("Hour is " + d.hour.toString());
+
+      if(lastms > -1)
+      {
+        offsetmsper += cycle.startTime - lastms;
+      }
+
+      lastms = cycle.startTime;
       c++;
     });
 
@@ -288,35 +296,22 @@ class _Nocturnal extends State<Nocturnal> {
     int min = 0;
 
     ams = (ams / c).floor().toInt();
-
+    offsetmsper = (offsetmsper / (c - 1)).floor().toInt();
+    
     if(ams > 60 * 1000 * 60)
     {
       hou = (ams / (1000 * 60 * 60)).floor();
       ams -= hou * 60 * 60 * 1000;
       min = (ams / (1000 * 60)).ceil();
     }
-    
-    return h12(hou).toString() + ":" + minify(min) + " " + ampm(hou);
-  }
 
-  int h12(int h24)
-  {
-    return (h24 + 1 > 12) ? (h24 - 12) : h24;
-  }
-
-  String ampm(int h)
-  {
-    return (h + 1 > 12) ? "PM" : "AM";
-  }
-  
-  String minify(int m)
-  {
-    if(m < 10)
+    if(min == 60)
     {
-      return "0$m";
+      min--;
     }
-
-    return "$m";
+    
+    log.log(offsetmsper.toString() + " ms");
+    return h12(hou).toString() + ":" + minify(min) + " " + ampm(hou) + (offsetmsper < 0 ? " -" : " +") + durationsh(offsetmsper.abs());
   }
 
   void updateCalculations()
@@ -362,12 +357,6 @@ class _Nocturnal extends State<Nocturnal> {
     sleepTime = computeTime(3, NocturnalAction.GOING_TO_SLEEP);
   }
 
-  void addHourOffset()
-  {
-    offsetms += 1000 * 60 * 60; 
-    log.log("Foward in time: " + (offsetms / (1000 * 60 * 60)).toString());
-  }
-
   @override
   Widget build(BuildContext context) {
     MaterialColor sw = awake ? Colors.indigo : Colors.deepPurple;
@@ -379,10 +368,6 @@ class _Nocturnal extends State<Nocturnal> {
           IconButton(
             icon: Icon(Icons.delete),
             onPressed: () => clearEvents()
-          ),
-          IconButton(
-            icon: Icon(Icons.tonality),
-            onPressed: () => addHourOffset()
           )
         ],
       ),
@@ -510,41 +495,6 @@ class TimeCard extends StatelessWidget
   final MaterialColor sw;
 
   TimeCard({this.c31, this.c7, this.c3, this.awake, this.title, this.count, this.sw});
-
-  String duration(int ms)
-  {
-    if(ms <= 0)
-    {
-      return "Unknown";
-    }
-
-    if(ms > 1000 * 60 * 60)
-    {
-      return ((ms / (1000 * 60 * 60)).toStringAsFixed(1) + " Hours").replaceFirst(".0", "");
-    }
-
-    if(ms > 1000 * 60)
-    {
-      return (ms / (1000 * 60)).round().toInt().toString() + " Minutes";
-    }
-
-    if(ms > 1000)
-    {
-      return (ms / 1000).round().toInt().toString() + " Seconds";
-    }
-
-    return "$ms Ms";
-  }
-
-  String minify(int m)
-  {
-    if(m < 10)
-    {
-      return "0$m";
-    }
-
-    return "$m";
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -744,3 +694,73 @@ class Nocons {
   static const IconData icons8_sun = const IconData(0xe801, fontFamily: _kFontFam);
   static const IconData icons8_occupied_bed = const IconData(0xe802, fontFamily: _kFontFam);
 }
+
+String duration(int ms)
+  {
+    if(ms <= 0)
+    {
+      return "Unknown";
+    }
+
+    if(ms > 1000 * 60 * 60)
+    {
+      return ((ms / (1000 * 60 * 60)).toStringAsFixed(1) + " Hours").replaceFirst(".0", "");
+    }
+
+    if(ms > 1000 * 60)
+    {
+      return (ms / (1000 * 60)).round().toInt().toString() + " Minutes";
+    }
+
+    if(ms > 1000)
+    {
+      return (ms / 1000).round().toInt().toString() + " Seconds";
+    }
+
+    return "$ms Ms";
+  }
+
+  String durationsh(int ms)
+  {
+    if(ms <= 0)
+    {
+      return "Unknown";
+    }
+
+    if(ms > 1000 * 60 * 60)
+    {
+      return ((ms / (1000 * 60 * 60)).toStringAsFixed(1) + " Hours").replaceFirst(".0", "");
+    }
+
+    if(ms > 1000 * 60)
+    {
+      return (ms / (1000 * 60)).round().toInt().toString() + " Min";
+    }
+
+    if(ms > 1000)
+    {
+      return (ms / 1000).round().toInt().toString() + " Sec";
+    }
+
+    return "$ms Ms";
+  }
+
+  String minify(int m)
+  {
+    if(m < 10)
+    {
+      return "0$m";
+    }
+
+    return "$m";
+  }
+
+  int h12(int h24)
+  {
+    return (h24 + 1 > 12) ? (h24 - 12) : h24;
+  }
+
+  String ampm(int h)
+  {
+    return (h + 1 > 12) ? "PM" : "AM";
+  }
