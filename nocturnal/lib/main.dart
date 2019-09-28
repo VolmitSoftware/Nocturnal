@@ -17,6 +17,7 @@ class NocturnalApp extends StatelessWidget {
       title: 'Nocturnal',
       theme: ThemeData(
         primarySwatch: Colors.indigo,
+        brightness: Brightness.light
       ),
       home: Nocturnal(title: 'Nocturnal'),
     );
@@ -35,7 +36,18 @@ class Nocturnal extends StatefulWidget {
 class _Nocturnal extends State<Nocturnal> {
   bool awake = true;
   NocturnalEvents events = new NocturnalEvents();
-  int avgCycleLength = 0;
+  int avgCycleLength3 = 0;
+  int avgDayCycleLength3 = 0;
+  int avgNightCycleLength3 = 0;
+  int avgCycleLength7 = 0;
+  int avgDayCycleLength7 = 0;
+  int avgNightCycleLength7 = 0;
+  int avgCycleLength31 = 0;
+  int avgDayCycleLength31 = 0;
+  int avgNightCycleLength31 = 0;
+  int fullCount = 0;
+  int dayCount = 0;
+  int nightCount = 0;
 
   _Nocturnal()
   {
@@ -49,7 +61,45 @@ class _Nocturnal extends State<Nocturnal> {
     })));
   }
 
-  List<Cycle> getRecentCycles(int maxCycles)
+  List<Cycle> getFullCycles(int max)
+  {
+    int phase = 0;
+    int a = 0;
+    int c = 0;
+    List<Cycle> cycles = new List<Cycle>();
+
+    for(int i = events.events.length - 1; i > 0; i--)
+    {
+      NocturnalEvent e = events.events[i];
+
+      if(phase == 0 && e.action == NocturnalAction.WAKING_UP)
+      {
+        phase++;
+        c = e.ms;
+      }
+
+      else if(phase == 1 && e.action == NocturnalAction.GOING_TO_SLEEP && c > 0)
+      {
+        phase++;
+      }
+
+      else if(phase == 2 && e.action == NocturnalAction.WAKING_UP && c > 0)
+      {
+        phase = 0;
+        a = e.ms;
+        cycles.add(new Cycle(a, c));
+      }
+
+      if(cycles.length >= max)
+      {
+        break;
+      }
+    }
+
+    return cycles;
+  }
+
+  List<Cycle> getHalfCycles(int max, NocturnalAction side)
   {
     bool enter = false;
     int start = 0;
@@ -60,41 +110,59 @@ class _Nocturnal extends State<Nocturnal> {
     {
       NocturnalEvent e = events.events[i];
 
-      if(!enter && e.action == NocturnalAction.WAKING_UP)
+      if(!enter && e.action != side)
       {
         enter = true;
         end = e.ms;
       }
 
-      else if(enter && e.action == NocturnalAction.GOING_TO_SLEEP && end > 0)
+      else if(enter && e.action == side && end > 0)
       {
         enter = false;
         start = e.ms;
         cycles.add(new Cycle(start, end));
       }
 
-      if(cycles.length >= maxCycles)
+      if(cycles.length >= max)
       {
         break;
       }
     }
 
     return cycles;
-  }
-
-  int computeAverageCycleTime(int maxCycles)
+  } 
+  
+  int computeAverageFullCycleTime(int maxCycles)
   {
     double avg = 0;
     int itr = 0;
 
-    getRecentCycles(maxCycles).forEach((c) {
+    getFullCycles(maxCycles).forEach((c) {
       avg += c.getDuration();
       itr++;
     });
 
-    if(itr == 0)
+    if(itr < maxCycles)
     {
-      return 0;
+      return -1;
+    }
+
+    return (avg / itr).round();
+  }
+
+  int computeAverageHalfCycleTime(int maxCycles, NocturnalAction side)
+  {
+    double avg = 0;
+    int itr = 0;
+
+    getHalfCycles(maxCycles, side).forEach((c) {
+      avg += c.getDuration();
+      itr++;
+    });
+
+    if(itr < maxCycles)
+    {
+      return -1;
     }
 
     return (avg / itr).round();
@@ -162,9 +230,65 @@ class _Nocturnal extends State<Nocturnal> {
     saveAwake(awake).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + (awake ? "Awake" : "Asleep")));
   }
 
+  int computeFullCycleCount()
+  {
+    return (events.events.length / 2).floor().toInt();
+  }
+
+  int computeHalfCycleCount(NocturnalAction side)
+  {
+    return events.events.length - (events.events.length % 2 == 0 ? 0 : 1);
+  }
+
   void updateCalculations()
   {
-    avgCycleLength = computeAverageCycleTime(3); 
+    fullCount = computeFullCycleCount();
+    dayCount = computeHalfCycleCount(NocturnalAction.WAKING_UP);
+    nightCount = computeHalfCycleCount(NocturnalAction.GOING_TO_SLEEP);
+    avgCycleLength3 = computeAverageFullCycleTime(1); 
+    avgDayCycleLength3 = computeAverageHalfCycleTime(3, NocturnalAction.WAKING_UP); 
+    avgNightCycleLength3 = computeAverageHalfCycleTime(3, NocturnalAction.GOING_TO_SLEEP); 
+    avgCycleLength7 = computeAverageFullCycleTime(3); 
+    avgDayCycleLength7 = computeAverageHalfCycleTime(7, NocturnalAction.WAKING_UP); 
+    avgNightCycleLength7 = computeAverageHalfCycleTime(7, NocturnalAction.GOING_TO_SLEEP); 
+    avgCycleLength31 = computeAverageFullCycleTime(14); 
+    avgDayCycleLength31 = computeAverageHalfCycleTime(31, NocturnalAction.WAKING_UP); 
+    avgNightCycleLength31 = computeAverageHalfCycleTime(31, NocturnalAction.GOING_TO_SLEEP); 
+  }
+
+  String duration(int ms)
+  {
+    if(ms <= 0)
+    {
+      return "Unknown";
+    }
+
+    if(ms > 1000 * 60 * 60)
+    {
+      return (ms / 1000 * 60 * 60).toStringAsPrecision(1) + " Hours";
+    }
+
+    if(ms > 1000 * 60)
+    {
+      return (ms / 1000 * 60).round().toInt().toString() + " Minutes";
+    }
+
+    if(ms > 1000)
+    {
+      return (ms / 1000).round().toInt().toString() + " Seconds";
+    }
+
+    return "$ms Ms";
+  }
+
+  String minify(int m)
+  {
+    if(m < 10)
+    {
+      return "0$m";
+    }
+
+    return "$m";
   }
 
   @override
@@ -172,6 +296,7 @@ class _Nocturnal extends State<Nocturnal> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        backgroundColor: awake ? Colors.indigo : Colors.deepPurple,
         actions: <Widget>[
           IconButton(
             icon: Icon(Icons.delete),
@@ -179,19 +304,197 @@ class _Nocturnal extends State<Nocturnal> {
           )
         ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: GridView.count(
+          crossAxisCount: 2,
           children: <Widget>[
-            Text(awake ? "Awake" : "Asleep"),
-            Text(events.events.length.toString() + " Entries"),
-            Text(avgCycleLength.toString() + " Avg Cycle Length")
+            Padding(
+              padding: EdgeInsets.all(3),
+              child: Card(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(awake ? "Awake" : "Asleep",
+                        style: TextStyle(
+                          fontSize: 48,
+                          color: awake ? Colors.indigo.shade700 : Colors.deepPurple.shade800
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(3),
+              child: Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text("Full Cycle",
+                        style: TextStyle(
+                          fontSize: 24
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text("$fullCount Entries",
+                        style: TextStyle(
+                          fontSize: 18
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgCycleLength31),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade900,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgCycleLength7),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade600,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgCycleLength3),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade400
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(3),
+              child: Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text("Night Cycle",
+                        style: TextStyle(
+                          fontSize: 24
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text("$nightCount Entries",
+                        style: TextStyle(
+                          fontSize: 18
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgNightCycleLength31),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade900,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgNightCycleLength7),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade600,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgNightCycleLength3),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade400
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(3),
+              child: Card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text("Day Cycle",
+                        style: TextStyle(
+                          fontSize: 24
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text("$dayCount Entries",
+                        style: TextStyle(
+                          fontSize: 18
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgDayCycleLength31),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade900,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgDayCycleLength7),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade600,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.all(7),
+                      child: Text(duration(avgDayCycleLength3),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo.shade400
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              ),
+            )
           ],
-        ),
+        )
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => toggleAwake(),
         tooltip: 'Sleep',
+        backgroundColor: awake ? Colors.indigo : Colors.deepPurple,
         child: Icon(awake ? Nocons.icons8_moon_symbol : Nocons.icons8_sun)
       ),
     );
