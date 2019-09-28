@@ -3,9 +3,14 @@ import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer' as log;
 
-void main() => runApp(MyApp());
+void main() => runApp(NocturnalApp());
 
-class MyApp extends StatelessWidget {
+int timeMs()
+{
+   return DateTime.now().millisecondsSinceEpoch;
+}
+
+class NocturnalApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -16,11 +21,6 @@ class MyApp extends StatelessWidget {
       home: Nocturnal(title: 'Nocturnal'),
     );
   }
-}
-
-int timeMs()
-{
-   return DateTime.now().millisecondsSinceEpoch;
 }
 
 class Nocturnal extends StatefulWidget {
@@ -35,13 +35,64 @@ class Nocturnal extends StatefulWidget {
 class _Nocturnal extends State<Nocturnal> {
   bool awake = true;
   NocturnalEvents events = new NocturnalEvents();
+  int avgCycleLength = 0;
 
   _Nocturnal()
   {
-    loadData().then((d) => events = d).then((x) => loadAwake().then((g) => awake = g).then((h) => setState(() {
+    loadData().then((d) => events = d)
+    .then((x) => loadAwake()
+    .then((g) => awake = g)
+    .then((h) => setState(() {
       log.log(awake ? "Currently Awake" : "Currently Asleep");
       log.log("Entries: " + events.events.length.toString());
+      updateCalculations();
     })));
+  }
+
+  List<Cycle> getRecentCycles(int maxCycles)
+  {
+    bool enter = false;
+    int start = 0;
+    int end = 0;
+    List<Cycle> cycles = new List<Cycle>();
+
+    for(int i = events.events.length - 1; i > 0; i--)
+    {
+      NocturnalEvent e = events.events[i];
+
+      if(!enter && e.action == NocturnalAction.WAKING_UP)
+      {
+        enter = true;
+        end = e.ms;
+      }
+
+      else if(enter && e.action == NocturnalAction.GOING_TO_SLEEP && end > 0)
+      {
+        enter = false;
+        start = e.ms;
+        cycles.add(new Cycle(start, end));
+      }
+
+      if(cycles.length >= maxCycles)
+      {
+        break;
+      }
+    }
+
+    return cycles;
+  }
+
+  int computeAverageCycleTime(int maxCycles)
+  {
+    double avg = 0;
+    int itr = 0;
+
+    getRecentCycles(maxCycles).forEach((c) {
+      avg += c.getDuration();
+      itr++;
+    });
+
+    return (avg / itr).round();
   }
 
   Future<bool> saveAwake(bool value) async
@@ -90,8 +141,14 @@ class _Nocturnal extends State<Nocturnal> {
       events.events.add(new NocturnalEvent(timeMs(), awake ? NocturnalAction.GOING_TO_SLEEP : NocturnalAction.WAKING_UP));
       awake = !awake;
     });
+    updateCalculations();
     saveData(events).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + events.events.length.toString() + " Entries"));
     saveAwake(awake).then((v) => log.log((v ? "Saved" : "Failed to save") + " -> " + (awake ? "Awake" : "Asleep")));
+  }
+
+  void updateCalculations()
+  {
+    avgCycleLength = computeAverageCycleTime(3); 
   }
 
   @override
@@ -105,7 +162,8 @@ class _Nocturnal extends State<Nocturnal> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(awake ? "Awake" : "Asleep"),
-            Text(events.events.length.toString() + " Entries")
+            Text(events.events.length.toString() + " Entries"),
+            Text(avgCycleLength.toString() + " Avg Cycle Length")
           ],
         ),
       ),
@@ -156,6 +214,18 @@ class NocturnalEvents
     events.forEach((e) => f += "&" + e.toString());
 
     return f.substring(1);
+  }
+}
+
+class Cycle
+{
+  final int startTime;
+  final int endTime;
+  Cycle(this.startTime, this.endTime);
+
+  int getDuration()
+  {
+    return endTime - startTime;
   }
 }
 
